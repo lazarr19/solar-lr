@@ -1,7 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { fetchDayAheadPrices } from "./entsoe";
 import { fetchCBC } from "./nosbih";
-import { MOCK_SEEPEX, MOCK_CBC } from "./mock";
 import type { PricesResponse } from "./types";
 
 /** Return today's date as YYYY-MM-DD in Europe/Belgrade timezone */
@@ -35,17 +34,9 @@ async function _getPrices(deliveryDate: string): Promise<PricesResponse> {
   const seepexAvailable = seepexRaw.some((v) => v !== null);
   const cbcAvailable = cbcRaw.some((v) => v !== null);
 
-  // Fall back to mock data if live fetch returned all nulls
-  const seepexFinal: (number | null)[] = seepexAvailable
-    ? seepexRaw
-    : (MOCK_SEEPEX as (number | null)[]);
-  const cbcFinal: (number | null)[] = cbcAvailable
-    ? cbcRaw
-    : (MOCK_CBC as (number | null)[]);
-
   const hours = Array.from({ length: 24 }, (_, i) => {
-    const seepex = seepexFinal[i] ?? null;
-    const cbc = cbcFinal[i] ?? null;
+    const seepex = seepexRaw[i] ?? null;
+    const cbc = cbcRaw[i] ?? null;
     const efektivna =
       seepex !== null && cbc !== null
         ? Math.round((seepex * 0.85 - cbc) * 100) / 100
