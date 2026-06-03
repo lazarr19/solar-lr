@@ -51,9 +51,11 @@ export async function fetchCBC(
       const hourIndex = parseInt(hourMatch[1], 10) - 1; // convert to 0-based
       if (hourIndex < 0 || hourIndex > 23) continue;
 
-      const price = parseFloat(s.MarginalPrice?.[0] ?? "");
-      if (!isNaN(price)) {
-        cbc[hourIndex] = price;
+      const priceKM = parseFloat(s.MarginalPrice?.[0] ?? "");
+      if (!isNaN(priceKM)) {
+        // MarginalPrice is in KM (Bosnian Convertible Mark); convert to EUR
+        // Fixed peg: 1 EUR = 1.95583 KM
+        cbc[hourIndex] = Math.round((priceKM / 1.95583) * 100) / 100;
       }
     }
 
