@@ -52,9 +52,9 @@ export async function fetchCBC(
       const hourIndex = parseInt(hourMatch[1], 10) - 1;
       if (hourIndex < 0 || hourIndex > 23) continue;
 
-      const priceKM = parseFloat(s.MarginalPrice?.[0] ?? "");
-      if (!isNaN(priceKM)) {
-        cbc[hourIndex] = Math.round((priceKM / 1.95583) * 100) / 100;
+      const price = parseFloat(s.MarginalPrice?.[0] ?? "");
+      if (!isNaN(price)) {
+        cbc[hourIndex] = Math.round(price * 100) / 100;
       }
     }
 

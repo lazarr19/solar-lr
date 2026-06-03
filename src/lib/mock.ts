@@ -31,7 +31,6 @@ export const MOCK_SEEPEX: number[] = [
 
 /**
  * Real CBC (MarginalPrice BA→RS) from NOSBiH auction for June 4, 2026.
- * Values converted from KM to EUR (÷ 1.95583 fixed peg).
  * Used as fallback if the live fetch fails.
  */
 export const MOCK_CBC: number[] = [
@@ -40,7 +39,7 @@ export const MOCK_CBC: number[] = [
   43.52,
   43.52,
   43.52,
-  43.52, // 00–06  (85.11 KM)
+  43.52, // 00–06
   3.86,
   43.52,
   13.06,

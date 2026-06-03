@@ -80,7 +80,7 @@ interface Props {
 }
 
 export default function DashboardClient({ todayData, tomorrowData }: Props) {
-  const [activeTab, setActiveTab] = useState<"today" | "tomorrow">("tomorrow");
+  const [activeTab, setActiveTab] = useState<"today" | "tomorrow">("today");
   const data = activeTab === "today" ? todayData : tomorrowData;
 
   const [currentHour, setCurrentHour] = useState<number | null>(null);
