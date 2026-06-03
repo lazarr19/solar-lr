@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { TrendingDown, TrendingUp, Minus, Sun } from "lucide-react";
 import type { PricesResponse } from "@/lib/types";
 import PriceChart from "./PriceChart";
@@ -83,16 +83,22 @@ export default function DashboardClient({ todayData, tomorrowData }: Props) {
   const [activeTab, setActiveTab] = useState<"today" | "tomorrow">("tomorrow");
   const data = activeTab === "today" ? todayData : tomorrowData;
 
-  const currentHour: number | null =
-    activeTab === "today"
-      ? (Number(
+  const [currentHour, setCurrentHour] = useState<number | null>(null);
+  useEffect(() => {
+    if (activeTab === "today") {
+      setCurrentHour(
+        Number(
           new Date().toLocaleString("en-US", {
             timeZone: "Europe/Belgrade",
             hour: "numeric",
             hour12: false,
           }),
-        ) % 24)
-      : null;
+        ) % 24,
+      );
+    } else {
+      setCurrentHour(null);
+    }
+  }, [activeTab]);
 
   const validHours = data.hours.filter((h) => h.efektivna !== null);
   const avg =

@@ -1,32 +1,36 @@
+import https from "node:https";
 import { parseStringPromise } from "xml2js";
 
-// Serbia EIC code — "in" area means energy flows INTO Serbia (BA→RS import)
 const SERBIA_EIC = "10YCS-SERBIATSOV";
 
-/**
- * Fetch the CBC (MarginalPrice) for each of the 24 local hours of `deliveryDate`
- * from the NOSBiH day-ahead capacity auction XML.
- *
- * URL pattern: https://www.nosbih.ba/files/auction/{YYYYMMDD}_AuctionSummary_BA-RS-D-{YYYYMMDD}.xml
- * Returns an array of 24 values (index 0 = 00:00–01:00 local time).
- * Null values indicate the data was unavailable for that hour.
- */
+function httpsGet(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    https
+      .get(
+        url,
+        { rejectUnauthorized: false, headers: { "User-Agent": "solar-prices-app/1.0" } },
+        (res) => {
+          if (res.statusCode !== 200) {
+            reject(new Error(`HTTP ${res.statusCode}`));
+            return;
+          }
+          const chunks: Buffer[] = [];
+          res.on("data", (chunk: Buffer) => chunks.push(chunk));
+          res.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
+        },
+      )
+      .on("error", reject);
+  });
+}
+
 export async function fetchCBC(
   deliveryDate: string,
 ): Promise<(number | null)[]> {
-  const d = deliveryDate.replace(/-/g, ""); // YYYYMMDD
+  const d = deliveryDate.replace(/-/g, "");
   const url = `https://www.nosbih.ba/files/auction/${d}_AuctionSummary_BA-RS-D-${d}.xml`;
 
   try {
-    const res = await fetch(url, {
-      next: { revalidate: 3600 },
-      headers: { "User-Agent": "solar-prices-app/1.0" },
-    });
-
-    if (!res.ok) return Array(24).fill(null);
-
-    // Strip BOM if present (\uFEFF), then parse XML
-    const raw = await res.text();
+    const raw = await httpsGet(url);
     const xml = raw.replace(/^\uFEFF/, "");
     const parsed = await parseStringPromise(xml, { explicitArray: true });
 
@@ -36,25 +40,20 @@ export async function fetchCBC(
 
     const cbc: (number | null)[] = Array(24).fill(null);
 
-    for (const raw of summaries) {
-      const s = raw as Record<string, string[]>;
+    for (const entry of summaries) {
+      const s = entry as Record<string, string[]>;
 
-      // Only take BA→RS direction (energy flowing INTO Serbia)
-      const inArea = s.InAreaEicCode?.[0];
-      if (inArea !== SERBIA_EIC) continue;
+      if (s.InAreaEicCode?.[0] !== SERBIA_EIC) continue;
 
-      // ProductInstanceCode format: "BA-RS_01H_04" — extract 1-based hour index
       const code: string = s.ProductInstanceCode?.[0] ?? "";
       const hourMatch = code.match(/_(\d{2})H_/);
       if (!hourMatch) continue;
 
-      const hourIndex = parseInt(hourMatch[1], 10) - 1; // convert to 0-based
+      const hourIndex = parseInt(hourMatch[1], 10) - 1;
       if (hourIndex < 0 || hourIndex > 23) continue;
 
       const priceKM = parseFloat(s.MarginalPrice?.[0] ?? "");
       if (!isNaN(priceKM)) {
-        // MarginalPrice is in KM (Bosnian Convertible Mark); convert to EUR
-        // Fixed peg: 1 EUR = 1.95583 KM
         cbc[hourIndex] = Math.round((priceKM / 1.95583) * 100) / 100;
       }
     }
