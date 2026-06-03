@@ -1,26 +1,8 @@
-import { parseStringPromise } from "xml2js";
+const ENERGY_CHARTS_API = "https://api.energy-charts.info/price";
+const SERBIA_BZN = "RS";
 
-const ENTSOE_API = "https://web-api.tp.entsoe.eu/api";
-const SERBIA_EIC = "10YCS-SERBIATSOV";
-
-/** Format a Date as YYYYMMDDHHMM (UTC) for the ENTSO-E API */
-function fmtEntsoe(d: Date): string {
-  const p = (n: number, len = 2) => String(n).padStart(len, "0");
-  return (
-    p(d.getUTCFullYear(), 4) +
-    p(d.getUTCMonth() + 1) +
-    p(d.getUTCDate()) +
-    p(d.getUTCHours()) +
-    p(d.getUTCMinutes())
-  );
-}
-
-/**
- * Return the UTC offset in hours for Europe/Belgrade on the given date.
- * CEST (summer) = UTC+2, CET (winter) = UTC+1.
- */
+/** Return the UTC offset in hours for Europe/Belgrade on the given date. */
 function getSerbiaOffsetHours(date: Date): number {
-  // 'longOffset' timeZoneName gives e.g. "6/3/2026, GMT+02:00"
   const s = new Intl.DateTimeFormat("en-US", {
     timeZone: "Europe/Belgrade",
     timeZoneName: "longOffset",
@@ -31,82 +13,51 @@ function getSerbiaOffsetHours(date: Date): number {
 }
 
 /**
- * Fetch ENTSO-E day-ahead prices for Serbia for `deliveryDate` (YYYY-MM-DD, local time).
+ * Fetch day-ahead prices for Serbia for `deliveryDate` (YYYY-MM-DD, local time)
+ * via the free Fraunhofer ISE energy-charts API (no API key required).
  * Returns an array of 24 values indexed by local hour (0 = 00:00–01:00).
- * Returns 24 nulls if the API key is absent or the request fails.
+ * Returns 24 nulls if the request fails or data is unavailable.
  */
 export async function fetchDayAheadPrices(
   deliveryDate: string,
 ): Promise<(number | null)[]> {
-  const apiKey = process.env.ENTSOE_API_KEY;
-  if (!apiKey) return Array(24).fill(null);
-
-  // Determine UTC midnight for the delivery day (local 00:00 in Belgrade)
-  const [y, mo, d] = deliveryDate.split("-").map(Number);
-  const midDayUTC = new Date(Date.UTC(y, mo - 1, d, 12, 0, 0));
-  const offset = getSerbiaOffsetHours(midDayUTC);
-
-  // periodStart = local midnight UTC = Date.UTC(y, mo-1, d, -offset)
-  const periodStart = new Date(Date.UTC(y, mo - 1, d, -offset, 0, 0));
-  const periodEnd = new Date(Date.UTC(y, mo - 1, d + 1, -offset, 0, 0));
-
   const params = new URLSearchParams({
-    securityToken: apiKey,
-    documentType: "A44",
-    in_Domain: SERBIA_EIC,
-    out_Domain: SERBIA_EIC,
-    periodStart: fmtEntsoe(periodStart),
-    periodEnd: fmtEntsoe(periodEnd),
+    bzn: SERBIA_BZN,
+    start: deliveryDate,
+    end: deliveryDate,
   });
 
   try {
-    const res = await fetch(`${ENTSOE_API}?${params}`, {
+    const res = await fetch(`${ENERGY_CHARTS_API}?${params}`, {
       next: { revalidate: 3600 },
     });
     if (!res.ok) return Array(24).fill(null);
 
-    const xml = await res.text();
-    const parsed = await parseStringPromise(xml, { explicitArray: true });
+    const data = (await res.json()) as {
+      unix_seconds: number[];
+      price: (number | null)[];
+    };
 
-    // ENTSO-E root can be namespaced; access by known key
-    const doc =
-      parsed["Publication_MarketDocument"] ?? parsed[Object.keys(parsed)[0]];
+    if (!Array.isArray(data.unix_seconds) || !Array.isArray(data.price)) {
+      return Array(24).fill(null);
+    }
 
-    const timeSeriesArr: unknown[] = doc?.TimeSeries ?? [];
+    const sums: number[] = Array(24).fill(0);
+    const counts: number[] = Array(24).fill(0);
+
+    for (let i = 0; i < data.unix_seconds.length; i++) {
+      const price = data.price[i];
+      if (price === null || price === undefined || isNaN(price)) continue;
+      const date = new Date(data.unix_seconds[i] * 1000);
+      const offset = getSerbiaOffsetHours(date);
+      const localHour = ((date.getUTCHours() + offset) % 24 + 24) % 24;
+      sums[localHour] += price;
+      counts[localHour]++;
+    }
+
     const prices: (number | null)[] = Array(24).fill(null);
-
-    for (const rawTs of timeSeriesArr) {
-      const ts = rawTs as Record<string, unknown[]>;
-      const periods = (ts.Period as Record<string, unknown[]>[]) ?? [];
-
-      for (const period of periods) {
-        const resolution = (period.resolution as string[])?.[0];
-        if (resolution !== "PT60M") continue; // only hourly data
-
-        // Get the UTC start of this period to map positions → local hours
-        const intervalStart = (
-          period.timeInterval as Record<string, string[]>[]
-        )?.[0]?.start?.[0];
-        if (!intervalStart) continue;
-
-        const startUTC = new Date(intervalStart);
-        const localOffsetHours = getSerbiaOffsetHours(startUTC);
-
-        const points = (period.Point as Record<string, string[]>[]) ?? [];
-        for (const pt of points) {
-          const pos = parseInt(pt.position?.[0], 10); // 1-based
-          const price = parseFloat(pt["price.amount"]?.[0]);
-          if (isNaN(pos) || isNaN(price)) continue;
-
-          // Convert position to local hour
-          const utcHour = (startUTC.getUTCHours() + (pos - 1)) % 24;
-          const localHour = (utcHour + localOffsetHours) % 24;
-
-          if (localHour >= 0 && localHour <= 23) {
-            prices[localHour] = price;
-          }
-        }
-      }
+    for (let h = 0; h < 24; h++) {
+      if (counts[h] > 0) prices[h] = sums[h] / counts[h];
     }
 
     return prices;

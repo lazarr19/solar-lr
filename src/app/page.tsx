@@ -1,4 +1,8 @@
-import { getCachedPrices, getTodayInSerbia, getTomorrowInSerbia } from "@/lib/prices";
+import {
+  getCachedPrices,
+  getTodayInSerbia,
+  getTomorrowInSerbia,
+} from "@/lib/prices";
 import DashboardClient from "@/components/DashboardClient";
 
 export const revalidate = 3600;

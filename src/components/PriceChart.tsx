@@ -18,6 +18,7 @@ import type { HourlyPrice } from "@/lib/types";
 
 interface Props {
   hours: HourlyPrice[];
+  currentHour?: number | null;
 }
 
 function barColor(efektivna: number | null): string {
@@ -84,9 +85,11 @@ function CustomTooltip({ active, payload, show }: any) {
 function ChartCanvas({
   hours,
   show,
+  currentHour,
 }: {
   hours: HourlyPrice[];
   show: { efektivna: boolean; seepex: boolean; cbc: boolean };
+  currentHour?: number | null;
 }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -124,6 +127,22 @@ function ChartCanvas({
           strokeWidth={1.5}
           opacity={0.5}
         />
+
+        {currentHour !== null && currentHour !== undefined && (
+          <ReferenceLine
+            x={String(currentHour).padStart(2, "0") + ":00"}
+            stroke="#f59e0b"
+            strokeWidth={2}
+            strokeDasharray="4 3"
+            label={{
+              value: "SADA",
+              position: "insideTopRight",
+              fontSize: 9,
+              fill: "#f59e0b",
+              fontWeight: 700,
+            }}
+          />
+        )}
 
         {show.efektivna && (
           <Bar
@@ -167,11 +186,11 @@ function ChartCanvas({
   );
 }
 
-export default function PriceChart({ hours }: Props) {
+export default function PriceChart({ hours, currentHour }: Props) {
   const [show, setShow] = useState({
     efektivna: true,
-    seepex: true,
-    cbc: true,
+    seepex: false,
+    cbc: false,
   });
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -246,7 +265,7 @@ export default function PriceChart({ hours }: Props) {
           </button>
         </div>
         <div className="flex-1 min-h-0">
-          <ChartCanvas hours={hours} show={show} />
+          <ChartCanvas hours={hours} show={show} currentHour={currentHour} />
         </div>
       </div>
 
@@ -265,7 +284,7 @@ export default function PriceChart({ hours }: Props) {
           <div className="chart-landscape">
             <TogglePills />
             <div className="flex-1 min-h-0">
-              <ChartCanvas hours={hours} show={show} />
+              <ChartCanvas hours={hours} show={show} currentHour={currentHour} />
             </div>
           </div>
         </div>

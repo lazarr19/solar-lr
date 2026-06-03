@@ -2,6 +2,7 @@ import type { HourlyPrice } from "@/lib/types";
 
 interface Props {
   hours: HourlyPrice[];
+  currentHour?: number | null;
 }
 
 function dotBg(v: number | null): string {
@@ -26,7 +27,7 @@ function fmt(v: number | null): string {
   return v !== null ? v.toFixed(2) : "—";
 }
 
-export default function PriceTable({ hours }: Props) {
+export default function PriceTable({ hours, currentHour }: Props) {
   return (
     <div className="overflow-x-auto overflow-y-auto max-h-[min(520px,80vh)]">
       <table className="w-full">
@@ -51,7 +52,11 @@ export default function PriceTable({ hours }: Props) {
           {hours.map((h) => (
             <tr
               key={h.hour}
-              className="group hover:bg-blue-50/40 dark:hover:bg-slate-800/40 transition-colors"
+              className={`group transition-colors ${
+                h.hour === currentHour
+                  ? "bg-amber-50 dark:bg-amber-950/20 hover:bg-amber-100/60 dark:hover:bg-amber-950/30"
+                  : "hover:bg-blue-50/40 dark:hover:bg-slate-800/40"
+              }`}
             >
               <td className="py-2.5 px-3 sm:px-5">
                 <span className="flex items-center gap-2">
@@ -61,6 +66,11 @@ export default function PriceTable({ hours }: Props) {
                   <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 tabular-nums font-medium">
                     {h.label}
                   </span>
+                  {h.hour === currentHour && (
+                    <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/50 px-1.5 py-0.5 rounded-full leading-none">
+                      SADA
+                    </span>
+                  )}
                 </span>
               </td>
               <td className="py-2.5 px-3 sm:px-5 text-right text-xs sm:text-sm text-blue-600 dark:text-blue-400 tabular-nums">

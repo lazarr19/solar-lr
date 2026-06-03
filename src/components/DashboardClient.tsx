@@ -1,20 +1,20 @@
-'use client';
+"use client";
 
-import { useState, type ReactNode } from 'react';
-import { TrendingDown, TrendingUp, Minus, Sun } from 'lucide-react';
-import type { PricesResponse } from '@/lib/types';
-import PriceChart from './PriceChart';
-import PriceTable from './PriceTable';
-import ThresholdSection from './ThresholdSection';
+import { useState, type ReactNode } from "react";
+import { TrendingDown, TrendingUp, Minus, Sun } from "lucide-react";
+import type { PricesResponse } from "@/lib/types";
+import PriceChart from "./PriceChart";
+import PriceTable from "./PriceTable";
+import ThresholdSection from "./ThresholdSection";
 
 function formatDisplayDate(isoDate: string): string {
-  const [y, m, d] = isoDate.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('sr-RS', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    timeZone: 'UTC',
+  const [y, m, d] = isoDate.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("sr-RS", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
   });
 }
 
@@ -23,11 +23,13 @@ function DataBadge({ ok, label }: { ok: boolean; label: string }) {
     <span
       className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium transition-colors ${
         ok
-          ? 'bg-green-100 text-green-700 dark:bg-green-950/60 dark:text-green-400'
-          : 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400'
+          ? "bg-green-100 text-green-700 dark:bg-green-950/60 dark:text-green-400"
+          : "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400"
       }`}
     >
-      <span className={`w-1.5 h-1.5 rounded-full ${ok ? 'bg-green-500' : 'bg-amber-400'}`} />
+      <span
+        className={`w-1.5 h-1.5 rounded-full ${ok ? "bg-green-500" : "bg-amber-400"}`}
+      />
       {label}
     </span>
   );
@@ -36,7 +38,7 @@ function DataBadge({ ok, label }: { ok: boolean; label: string }) {
 function StatCard({
   label,
   value,
-  unit = '€/MWh',
+  unit = "€/MWh",
   icon,
   iconClass,
   valueClass,
@@ -50,16 +52,22 @@ function StatCard({
 }) {
   return (
     <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 p-3 sm:p-4 flex flex-col gap-2.5">
-      <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${iconClass}`}>
+      <div
+        className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${iconClass}`}
+      >
         {icon}
       </div>
       <div>
-        <p className={`text-xl sm:text-2xl font-bold tabular-nums leading-none ${valueClass}`}>
-          {value !== null ? value.toFixed(1) : '—'}
+        <p
+          className={`text-xl sm:text-2xl font-bold tabular-nums leading-none ${valueClass}`}
+        >
+          {value !== null ? value.toFixed(1) : "—"}
         </p>
         <div className="flex items-baseline gap-1 mt-0.5">
           <p className="text-xs text-slate-400 dark:text-slate-500">{label}</p>
-          <p className="text-xs text-slate-300 dark:text-slate-600 hidden sm:inline">{unit}</p>
+          <p className="text-xs text-slate-300 dark:text-slate-600 hidden sm:inline">
+            {unit}
+          </p>
         </div>
       </div>
     </div>
@@ -72,19 +80,38 @@ interface Props {
 }
 
 export default function DashboardClient({ todayData, tomorrowData }: Props) {
-  const [activeTab, setActiveTab] = useState<'today' | 'tomorrow'>('tomorrow');
-  const data = activeTab === 'today' ? todayData : tomorrowData;
+  const [activeTab, setActiveTab] = useState<"today" | "tomorrow">("tomorrow");
+  const data = activeTab === "today" ? todayData : tomorrowData;
+
+  const currentHour: number | null =
+    activeTab === "today"
+      ? (Number(
+          new Date().toLocaleString("en-US", {
+            timeZone: "Europe/Belgrade",
+            hour: "numeric",
+            hour12: false,
+          }),
+        ) % 24)
+      : null;
 
   const validHours = data.hours.filter((h) => h.efektivna !== null);
   const avg =
     validHours.length > 0
       ? validHours.reduce((s, h) => s + h.efektivna!, 0) / validHours.length
       : null;
-  const min = validHours.length > 0 ? Math.min(...validHours.map((h) => h.efektivna!)) : null;
-  const max = validHours.length > 0 ? Math.max(...validHours.map((h) => h.efektivna!)) : null;
+  const min =
+    validHours.length > 0
+      ? Math.min(...validHours.map((h) => h.efektivna!))
+      : null;
+  const max =
+    validHours.length > 0
+      ? Math.max(...validHours.map((h) => h.efektivna!))
+      : null;
   const bestHour =
     validHours.length > 0
-      ? validHours.reduce((best, h) => (h.efektivna! > best.efektivna! ? h : best))
+      ? validHours.reduce((best, h) =>
+          h.efektivna! > best.efektivna! ? h : best,
+        )
       : null;
 
   return (
@@ -104,7 +131,7 @@ export default function DashboardClient({ todayData, tomorrowData }: Props) {
                 Cene električne energije
               </h1>
               <p className="text-xs text-slate-400 dark:text-slate-500 leading-none hidden sm:block">
-                Srbija · {activeTab === 'today' ? 'današnje' : 'sutrašnje'} cene
+                Srbija · {activeTab === "today" ? "današnje" : "sutrašnje"} cene
               </p>
             </div>
           </div>
@@ -120,8 +147,8 @@ export default function DashboardClient({ todayData, tomorrowData }: Props) {
         <div className="flex gap-2">
           {(
             [
-              { key: 'today' as const, label: 'Danas' },
-              { key: 'tomorrow' as const, label: 'Sutra' },
+              { key: "today" as const, label: "Danas" },
+              { key: "tomorrow" as const, label: "Sutra" },
             ] as const
           ).map(({ key, label }) => (
             <button
@@ -129,8 +156,8 @@ export default function DashboardClient({ todayData, tomorrowData }: Props) {
               onClick={() => setActiveTab(key)}
               className={`flex-1 sm:flex-none sm:min-w-[88px] py-2 px-4 rounded-xl text-sm font-semibold transition-all ${
                 activeTab === key
-                  ? 'bg-amber-500 text-white shadow-sm'
-                  : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-amber-300 dark:hover:border-amber-700'
+                  ? "bg-amber-500 text-white shadow-sm"
+                  : "bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-amber-300 dark:hover:border-amber-700"
               }`}
             >
               {label}
@@ -150,7 +177,7 @@ export default function DashboardClient({ todayData, tomorrowData }: Props) {
               </p>
               {bestHour && (
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
-                  Najpovoljniji sat:{' '}
+                  Najpovoljniji sat:{" "}
                   <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                     {bestHour.label} · {bestHour.efektivna!.toFixed(2)} €/MWh
                   </span>
@@ -158,12 +185,14 @@ export default function DashboardClient({ todayData, tomorrowData }: Props) {
               )}
             </div>
             <div className="text-right flex-shrink-0">
-              <p className="text-xs text-slate-400 dark:text-slate-500">Učitano</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">
+                Učitano
+              </p>
               <p className="text-xs font-medium text-slate-500 dark:text-slate-400 tabular-nums">
-                {new Date(data.fetchedAt).toLocaleTimeString('sr-RS', {
-                  timeZone: 'Europe/Belgrade',
-                  hour: '2-digit',
-                  minute: '2-digit',
+                {new Date(data.fetchedAt).toLocaleTimeString("sr-RS", {
+                  timeZone: "Europe/Belgrade",
+                  hour: "2-digit",
+                  minute: "2-digit",
                 })}
               </p>
             </div>
@@ -206,7 +235,7 @@ export default function DashboardClient({ todayData, tomorrowData }: Props) {
             </span>
           </div>
           <div className="h-72 sm:h-80 lg:h-96">
-            <PriceChart hours={data.hours} />
+            <PriceChart hours={data.hours} currentHour={currentHour} />
           </div>
         </div>
 
@@ -223,7 +252,7 @@ export default function DashboardClient({ todayData, tomorrowData }: Props) {
               </span>
             </h2>
           </div>
-          <PriceTable hours={data.hours} />
+          <PriceTable hours={data.hours} currentHour={currentHour} />
         </div>
 
         <p className="text-xs text-center text-slate-400 dark:text-slate-600 pb-6 pt-1">
