@@ -14,7 +14,13 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Cene struje · Srbija",
-  description: "Sutrašnje cene električne energije za Srbiju — SEEPEX day-ahead i CBC (BA→RS)",
+  description:
+    "Sutrašnje cene električne energije za Srbiju — SEEPEX day-ahead i CBC (BA→RS)",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Cene struje",
+  },
 };
 
 export const viewport: Viewport = {

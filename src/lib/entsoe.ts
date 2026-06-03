@@ -1,11 +1,11 @@
-import { parseStringPromise } from 'xml2js';
+import { parseStringPromise } from "xml2js";
 
-const ENTSOE_API = 'https://web-api.tp.entsoe.eu/api';
-const SERBIA_EIC = '10YCS-SERBIATSOV';
+const ENTSOE_API = "https://web-api.tp.entsoe.eu/api";
+const SERBIA_EIC = "10YCS-SERBIATSOV";
 
 /** Format a Date as YYYYMMDDHHMM (UTC) for the ENTSO-E API */
 function fmtEntsoe(d: Date): string {
-  const p = (n: number, len = 2) => String(n).padStart(len, '0');
+  const p = (n: number, len = 2) => String(n).padStart(len, "0");
   return (
     p(d.getUTCFullYear(), 4) +
     p(d.getUTCMonth() + 1) +
@@ -21,13 +21,13 @@ function fmtEntsoe(d: Date): string {
  */
 function getSerbiaOffsetHours(date: Date): number {
   // 'longOffset' timeZoneName gives e.g. "6/3/2026, GMT+02:00"
-  const s = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Europe/Belgrade',
-    timeZoneName: 'longOffset',
+  const s = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Belgrade",
+    timeZoneName: "longOffset",
   }).format(date);
   const m = s.match(/GMT([+-])(\d+)/);
   if (!m) return 1;
-  return m[1] === '+' ? parseInt(m[2], 10) : -parseInt(m[2], 10);
+  return m[1] === "+" ? parseInt(m[2], 10) : -parseInt(m[2], 10);
 }
 
 /**
@@ -42,7 +42,7 @@ export async function fetchDayAheadPrices(
   if (!apiKey) return Array(24).fill(null);
 
   // Determine UTC midnight for the delivery day (local 00:00 in Belgrade)
-  const [y, mo, d] = deliveryDate.split('-').map(Number);
+  const [y, mo, d] = deliveryDate.split("-").map(Number);
   const midDayUTC = new Date(Date.UTC(y, mo - 1, d, 12, 0, 0));
   const offset = getSerbiaOffsetHours(midDayUTC);
 
@@ -52,7 +52,7 @@ export async function fetchDayAheadPrices(
 
   const params = new URLSearchParams({
     securityToken: apiKey,
-    documentType: 'A44',
+    documentType: "A44",
     in_Domain: SERBIA_EIC,
     out_Domain: SERBIA_EIC,
     periodStart: fmtEntsoe(periodStart),
@@ -70,8 +70,7 @@ export async function fetchDayAheadPrices(
 
     // ENTSO-E root can be namespaced; access by known key
     const doc =
-      parsed['Publication_MarketDocument'] ??
-      parsed[Object.keys(parsed)[0]];
+      parsed["Publication_MarketDocument"] ?? parsed[Object.keys(parsed)[0]];
 
     const timeSeriesArr: unknown[] = doc?.TimeSeries ?? [];
     const prices: (number | null)[] = Array(24).fill(null);
@@ -82,11 +81,12 @@ export async function fetchDayAheadPrices(
 
       for (const period of periods) {
         const resolution = (period.resolution as string[])?.[0];
-        if (resolution !== 'PT60M') continue; // only hourly data
+        if (resolution !== "PT60M") continue; // only hourly data
 
         // Get the UTC start of this period to map positions → local hours
-        const intervalStart =
-          (period.timeInterval as Record<string, string[]>[])?.[0]?.start?.[0];
+        const intervalStart = (
+          period.timeInterval as Record<string, string[]>[]
+        )?.[0]?.start?.[0];
         if (!intervalStart) continue;
 
         const startUTC = new Date(intervalStart);
@@ -95,12 +95,11 @@ export async function fetchDayAheadPrices(
         const points = (period.Point as Record<string, string[]>[]) ?? [];
         for (const pt of points) {
           const pos = parseInt(pt.position?.[0], 10); // 1-based
-          const price = parseFloat(pt['price.amount']?.[0]);
+          const price = parseFloat(pt["price.amount"]?.[0]);
           if (isNaN(pos) || isNaN(price)) continue;
 
           // Convert position to local hour
-          const utcHour =
-            (startUTC.getUTCHours() + (pos - 1)) % 24;
+          const utcHour = (startUTC.getUTCHours() + (pos - 1)) % 24;
           const localHour = (utcHour + localOffsetHours) % 24;
 
           if (localHour >= 0 && localHour <= 23) {

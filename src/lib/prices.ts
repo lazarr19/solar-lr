@@ -1,18 +1,28 @@
-import { unstable_cache } from 'next/cache';
-import { fetchDayAheadPrices } from './entsoe';
-import { fetchCBC } from './nosbih';
-import { MOCK_SEEPEX, MOCK_CBC } from './mock';
-import type { PricesResponse } from './types';
+import { unstable_cache } from "next/cache";
+import { fetchDayAheadPrices } from "./entsoe";
+import { fetchCBC } from "./nosbih";
+import { MOCK_SEEPEX, MOCK_CBC } from "./mock";
+import type { PricesResponse } from "./types";
 
-/** Return tomorrow's date as YYYY-MM-DD in Europe/Belgrade timezone */
-export function getTomorrowInSerbia(): string {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
+/** Return today's date as YYYY-MM-DD in Europe/Belgrade timezone */
+export function getTodayInSerbia(): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Europe/Belgrade',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
+  }).format(new Date());
+}
+
+/** Return tomorrow's date as YYYY-MM-DD in Europe/Belgrade timezone */
+export function getTomorrowInSerbia(): string {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Belgrade",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   }).format(tomorrow);
 }
 
@@ -42,7 +52,7 @@ async function _getPrices(deliveryDate: string): Promise<PricesResponse> {
         : null;
     return {
       hour: i,
-      label: `${String(i).padStart(2, '0')}:00`,
+      label: `${String(i).padStart(2, "0")}:00`,
       seepex,
       cbc,
       efektivna,
@@ -59,8 +69,7 @@ async function _getPrices(deliveryDate: string): Promise<PricesResponse> {
 }
 
 /** Cached version — revalidates every hour */
-export const getCachedPrices = unstable_cache(
-  _getPrices,
-  ['prices'],
-  { revalidate: 3600, tags: ['prices'] },
-);
+export const getCachedPrices = unstable_cache(_getPrices, ["prices"], {
+  revalidate: 3600,
+  tags: ["prices"],
+});

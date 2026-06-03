@@ -1,29 +1,29 @@
-import type { HourlyPrice } from '@/lib/types';
+import type { HourlyPrice } from "@/lib/types";
 
 interface Props {
   hours: HourlyPrice[];
 }
 
 function dotBg(v: number | null): string {
-  if (v === null) return 'bg-slate-300 dark:bg-slate-600';
-  if (v < 0) return 'bg-red-500';
-  if (v < 20) return 'bg-orange-500';
-  if (v < 40) return 'bg-yellow-400';
-  if (v < 60) return 'bg-green-500';
-  return 'bg-emerald-500';
+  if (v === null) return "bg-slate-300 dark:bg-slate-600";
+  if (v < 0) return "bg-red-500";
+  if (v < 20) return "bg-orange-500";
+  if (v < 40) return "bg-yellow-400";
+  if (v < 60) return "bg-green-500";
+  return "bg-emerald-500";
 }
 
 function efektivnaClass(v: number | null): string {
-  if (v === null) return 'text-slate-400 dark:text-slate-600';
-  if (v < 0) return 'text-red-600 dark:text-red-400 font-semibold';
-  if (v < 20) return 'text-orange-600 dark:text-orange-400 font-semibold';
-  if (v < 40) return 'text-yellow-600 dark:text-yellow-400 font-semibold';
-  if (v < 60) return 'text-green-600 dark:text-green-400 font-semibold';
-  return 'text-emerald-600 dark:text-emerald-400 font-bold';
+  if (v === null) return "text-slate-400 dark:text-slate-600";
+  if (v < 0) return "text-red-600 dark:text-red-400 font-semibold";
+  if (v < 20) return "text-orange-600 dark:text-orange-400 font-semibold";
+  if (v < 40) return "text-yellow-600 dark:text-yellow-400 font-semibold";
+  if (v < 60) return "text-green-600 dark:text-green-400 font-semibold";
+  return "text-emerald-600 dark:text-emerald-400 font-bold";
 }
 
 function fmt(v: number | null): string {
-  return v !== null ? v.toFixed(2) : '—';
+  return v !== null ? v.toFixed(2) : "—";
 }
 
 export default function PriceTable({ hours }: Props) {
@@ -69,7 +69,9 @@ export default function PriceTable({ hours }: Props) {
               <td className="py-2.5 px-3 sm:px-5 text-right text-xs sm:text-sm text-orange-500 dark:text-orange-400 tabular-nums">
                 {fmt(h.cbc)}
               </td>
-              <td className={`py-2.5 px-3 sm:px-5 text-right text-xs sm:text-sm tabular-nums ${efektivnaClass(h.efektivna)}`}>
+              <td
+                className={`py-2.5 px-3 sm:px-5 text-right text-xs sm:text-sm tabular-nums ${efektivnaClass(h.efektivna)}`}
+              >
                 {fmt(h.efektivna)}
               </td>
             </tr>
