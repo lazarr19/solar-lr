@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+import { TrendingDown, TrendingUp, Minus, Sun } from 'lucide-react';
 import { getCachedPrices, getTomorrowInSerbia } from '@/lib/prices';
 import PriceChart from '@/components/PriceChart';
 import PriceTable from '@/components/PriceTable';
@@ -15,6 +17,54 @@ function formatDisplayDate(isoDate: string): string {
   });
 }
 
+function DataBadge({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium transition-colors ${
+        ok
+          ? 'bg-green-100 text-green-700 dark:bg-green-950/60 dark:text-green-400'
+          : 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400'
+      }`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${ok ? 'bg-green-500' : 'bg-amber-400'}`} />
+      {label}
+    </span>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  unit = '€/MWh',
+  icon,
+  iconClass,
+  valueClass,
+}: {
+  label: string;
+  value: number | null;
+  unit?: string;
+  icon: ReactNode;
+  iconClass: string;
+  valueClass: string;
+}) {
+  return (
+    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 p-3 sm:p-4 flex flex-col gap-2.5">
+      <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${iconClass}`}>
+        {icon}
+      </div>
+      <div>
+        <p className={`text-xl sm:text-2xl font-bold tabular-nums leading-none ${valueClass}`}>
+          {value !== null ? value.toFixed(1) : '—'}
+        </p>
+        <div className="flex items-baseline gap-1 mt-0.5">
+          <p className="text-xs text-slate-400 dark:text-slate-500">{label}</p>
+          <p className="text-xs text-slate-300 dark:text-slate-600 hidden sm:inline">{unit}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default async function Home() {
   const tomorrow = getTomorrowInSerbia();
   const data = await getCachedPrices(tomorrow);
@@ -26,117 +76,140 @@ export default async function Home() {
       : null;
   const min = validHours.length > 0 ? Math.min(...validHours.map((h) => h.efektivna!)) : null;
   const max = validHours.length > 0 ? Math.max(...validHours.map((h) => h.efektivna!)) : null;
+  const bestHour =
+    validHours.length > 0
+      ? validHours.reduce((best, h) => (h.efektivna! > best.efektivna! ? h : best))
+      : null;
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-4 py-4">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">☀️</span>
-            <div>
-              <h1 className="text-lg font-bold text-slate-800 leading-tight">
-                Sutrašnje cene električne energije
+    <div className="min-h-screen bg-slate-50 dark:bg-[#080c14]">
+      {/* Top accent stripe */}
+      <div className="h-0.5 bg-gradient-to-r from-amber-400 via-orange-400 to-amber-400" />
+
+      {/* Sticky header */}
+      <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/90 dark:bg-slate-950/90 border-b border-slate-200/80 dark:border-slate-800/80">
+        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white shadow-sm">
+              <Sun className="w-4 h-4" strokeWidth={2.5} />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100 leading-tight truncate">
+                Cene električne energije
               </h1>
-              <p className="text-sm text-slate-500">Srbija · BA→RS granica</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500 leading-none hidden sm:block">
+                Srbija · sutrašnje cene
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span
-              className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-                data.seepexAvailable
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-amber-100 text-amber-700'
-              }`}
-            >
-              {data.seepexAvailable ? '✓ SEEPEX Live' : '⚠ SEEPEX Demo'}
-            </span>
-            <span
-              className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-                data.cbcAvailable
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-amber-100 text-amber-700'
-              }`}
-            >
-              {data.cbcAvailable ? '✓ CBC Live' : '⚠ CBC Demo'}
-            </span>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <DataBadge ok={data.seepexAvailable} label="SEEPEX" />
+            <DataBadge ok={data.cbcAvailable} label="CBC" />
           </div>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
-        {/* Date banner */}
-        <div className="bg-white rounded-xl border border-slate-200 px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-          <div>
-            <p className="text-xs text-slate-400 uppercase tracking-wide font-medium mb-0.5">
-              Datum isporuke
-            </p>
-            <p className="text-xl font-bold text-slate-800 capitalize">
-              {formatDisplayDate(data.date)}
-            </p>
-          </div>
-          <p className="text-xs text-slate-400">
-            Učitano: {new Date(data.fetchedAt).toLocaleTimeString('sr-RS', { timeZone: 'Europe/Belgrade' })}
-          </p>
-        </div>
-
-        {/* Summary stats */}
-        <div className="grid grid-cols-3 gap-4">
-          {[
-            { label: 'Minimum', value: min, color: 'text-orange-600' },
-            { label: 'Prosek', value: avg, color: 'text-blue-600' },
-            { label: 'Maksimum', value: max, color: 'text-green-600' },
-          ].map((stat) => (
-            <div
-              key={stat.label}
-              className="bg-white rounded-xl border border-slate-200 p-4 text-center"
-            >
-              <p className="text-xs text-slate-400 uppercase tracking-wide font-medium mb-1">
-                {stat.label}
+      <main className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-3 sm:space-y-4">
+        {/* Date card */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 p-4 sm:p-5">
+          <div className="flex items-start sm:items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold text-amber-500 uppercase tracking-widest mb-1">
+                Datum isporuke
               </p>
-              <p className={`text-2xl font-bold ${stat.color}`}>
-                {stat.value !== null ? stat.value.toFixed(2) : '—'}
+              <p className="text-lg sm:text-2xl font-bold text-slate-800 dark:text-slate-100 capitalize leading-tight">
+                {formatDisplayDate(data.date)}
               </p>
-              <p className="text-xs text-slate-400 mt-0.5">€/MWh</p>
+              {bestHour && (
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
+                  Najpovoljniji sat:{' '}
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                    {bestHour.label} · {bestHour.efektivna!.toFixed(2)} €/MWh
+                  </span>
+                </p>
+              )}
             </div>
-          ))}
-        </div>
-
-        {/* Chart */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <h2 className="text-sm font-semibold text-slate-600 mb-4">
-            Efektivna cena = SEEPEX × 0.85 − CBC
-          </h2>
-          <PriceChart hours={data.hours} />
-          <div className="mt-3 flex gap-4 text-xs text-slate-400 flex-wrap">
-            <span>
-              <span className="inline-block w-3 h-3 rounded-sm bg-green-500 mr-1 align-middle" />
-              Dobra cena (≥40)
-            </span>
-            <span>
-              <span className="inline-block w-3 h-3 rounded-sm bg-yellow-400 mr-1 align-middle" />
-              Srednja (20–40)
-            </span>
-            <span>
-              <span className="inline-block w-3 h-3 rounded-sm bg-orange-500 mr-1 align-middle" />
-              Niska (0–20)
-            </span>
-            <span>
-              <span className="inline-block w-3 h-3 rounded-sm bg-red-500 mr-1 align-middle" />
-              Negativna (&lt;0)
-            </span>
+            <div className="text-right flex-shrink-0">
+              <p className="text-xs text-slate-400 dark:text-slate-500">Učitano</p>
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 tabular-nums">
+                {new Date(data.fetchedAt).toLocaleTimeString('sr-RS', {
+                  timeZone: 'Europe/Belgrade',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Table */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <h2 className="text-sm font-semibold text-slate-600 mb-4">
-            Satni pregled · sve vrednosti u €/MWh
-          </h2>
+        {/* Stats grid */}
+        <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
+          <StatCard
+            label="Minimum"
+            value={min}
+            icon={<TrendingDown className="w-4 h-4" />}
+            iconClass="text-red-500 bg-red-50 dark:bg-red-950/40 dark:text-red-400"
+            valueClass="text-red-600 dark:text-red-400"
+          />
+          <StatCard
+            label="Prosek"
+            value={avg}
+            icon={<Minus className="w-4 h-4" />}
+            iconClass="text-blue-500 bg-blue-50 dark:bg-blue-950/40 dark:text-blue-400"
+            valueClass="text-blue-600 dark:text-blue-400"
+          />
+          <StatCard
+            label="Maksimum"
+            value={max}
+            icon={<TrendingUp className="w-4 h-4" />}
+            iconClass="text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-400"
+            valueClass="text-emerald-600 dark:text-emerald-400"
+          />
+        </div>
+
+        {/* Chart card */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 p-4 sm:p-5">
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Satna prognoza
+            </h2>
+            <span className="flex-shrink-0 text-xs bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-2.5 py-1 rounded-full font-mono whitespace-nowrap">
+              P × 0.85 − CBC
+            </span>
+          </div>
+          <div className="h-56 sm:h-72 lg:h-80">
+            <PriceChart hours={data.hours} />
+          </div>
+          <div className="mt-4 grid grid-cols-2 sm:flex sm:flex-wrap gap-x-5 gap-y-2 text-xs text-slate-400 dark:text-slate-500">
+            {[
+              { color: 'bg-emerald-500', label: 'Odlična (≥60)' },
+              { color: 'bg-green-500', label: 'Dobra (40–60)' },
+              { color: 'bg-yellow-400', label: 'Srednja (20–40)' },
+              { color: 'bg-orange-500', label: 'Niska (0–20)' },
+              { color: 'bg-red-500', label: 'Negativna (<0)' },
+            ].map((l) => (
+              <span key={l.label} className="flex items-center gap-1.5">
+                <span className={`w-2.5 h-2.5 rounded-sm flex-shrink-0 ${l.color}`} />
+                {l.label}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Table card */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
+          <div className="px-4 sm:px-5 py-3.5 border-b border-slate-100 dark:border-slate-800">
+            <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Satni pregled
+              <span className="ml-2 text-xs font-normal text-slate-400 dark:text-slate-500">
+                €/MWh
+              </span>
+            </h2>
+          </div>
           <PriceTable hours={data.hours} />
         </div>
 
-        <p className="text-xs text-center text-slate-400 pb-4">
+        <p className="text-xs text-center text-slate-400 dark:text-slate-600 pb-6 pt-1">
           Podaci: ENTSO-E Transparency Platform · NOSBiH aukcijski XML
         </p>
       </main>

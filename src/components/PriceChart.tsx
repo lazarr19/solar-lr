@@ -21,60 +21,84 @@ interface Props {
 
 function barColor(efektivna: number | null): string {
   if (efektivna === null) return '#94a3b8';
-  if (efektivna < 0) return '#ef4444';   // red  — negative
-  if (efektivna < 20) return '#f97316';  // orange — very low
-  if (efektivna < 40) return '#eab308';  // yellow — low
-  if (efektivna < 60) return '#22c55e';  // green  — good
-  return '#16a34a';                       // dark green — great
+  if (efektivna < 0) return '#ef4444';
+  if (efektivna < 20) return '#f97316';
+  if (efektivna < 40) return '#eab308';
+  if (efektivna < 60) return '#22c55e';
+  return '#10b981'; // emerald — excellent
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function CustomTooltip({ active, payload, label }: any) {
+function CustomTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null;
   const d = payload[0]?.payload as HourlyPrice;
+  const endHour = String(d.hour + 1).padStart(2, '0');
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-3 text-sm">
-      <p className="font-semibold text-slate-700 mb-1">{label}</p>
-      <p className="text-blue-600">
-        SEEPEX: {d.seepex !== null ? `${d.seepex.toFixed(2)} €/MWh` : '—'}
+    <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl p-3 text-xs min-w-[160px]">
+      <p className="font-bold text-slate-700 dark:text-slate-200 text-sm mb-2.5">
+        {d.label}–{endHour}:00
       </p>
-      <p className="text-orange-500">
-        CBC:&nbsp;&nbsp;&nbsp;&nbsp;{d.cbc !== null ? `${d.cbc.toFixed(2)} €/MWh` : '—'}
-      </p>
-      <p className="font-bold text-slate-800 mt-1 border-t border-slate-100 pt-1">
-        Efektivna: {d.efektivna !== null ? `${d.efektivna.toFixed(2)} €/MWh` : '—'}
-      </p>
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-6">
+          <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+            <span className="w-3 h-px bg-blue-500 inline-block" />
+            SEEPEX
+          </span>
+          <span className="font-semibold text-blue-600 dark:text-blue-400 tabular-nums">
+            {d.seepex !== null ? d.seepex.toFixed(2) : '—'}
+          </span>
+        </div>
+        <div className="flex items-center justify-between gap-6">
+          <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+            <span className="w-3 h-px bg-orange-500 inline-block border-dashed" />
+            CBC
+          </span>
+          <span className="font-semibold text-orange-500 dark:text-orange-400 tabular-nums">
+            {d.cbc !== null ? d.cbc.toFixed(2) : '—'}
+          </span>
+        </div>
+        <div className="pt-1.5 mt-0.5 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
+          <span className="text-slate-600 dark:text-slate-300 font-semibold">Efektivna</span>
+          <span
+            className="font-bold tabular-nums text-sm"
+            style={{ color: barColor(d.efektivna) }}
+          >
+            {d.efektivna !== null ? d.efektivna.toFixed(2) : '—'}
+          </span>
+        </div>
+        <p className="text-slate-300 dark:text-slate-600 text-center">€/MWh</p>
+      </div>
     </div>
   );
 }
 
 export default function PriceChart({ hours }: Props) {
   return (
-    <ResponsiveContainer width="100%" height={320}>
-      <ComposedChart data={hours} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+    <ResponsiveContainer width="100%" height="100%">
+      <ComposedChart data={hours} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
         <XAxis
           dataKey="label"
-          tick={{ fontSize: 11, fill: '#64748b' }}
-          tickLine={false}
-          axisLine={{ stroke: '#cbd5e1' }}
-        />
-        <YAxis
-          tick={{ fontSize: 11, fill: '#64748b' }}
+          tick={{ fontSize: 10, fill: '#94a3b8' }}
           tickLine={false}
           axisLine={false}
-          tickFormatter={(v) => `${v}`}
-          label={{
-            value: '€/MWh',
-            angle: -90,
-            position: 'insideLeft',
-            offset: 10,
-            style: { fill: '#94a3b8', fontSize: 11 },
-          }}
+          interval={2}
+          tickFormatter={(v: string) => v.replace(':00', '')}
         />
-        <Tooltip content={<CustomTooltip />} />
+        <YAxis
+          tick={{ fontSize: 10, fill: '#94a3b8' }}
+          tickLine={false}
+          axisLine={false}
+          width={36}
+        />
+        <Tooltip
+          content={<CustomTooltip />}
+          cursor={{ fill: 'rgba(148,163,184,0.08)' }}
+        />
         <Legend
-          wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
+          wrapperStyle={{ fontSize: 11, paddingTop: 10 }}
+          iconType="plainline"
+          iconSize={14}
           formatter={(value) =>
             value === 'efektivna'
               ? 'Efektivna cena'
@@ -83,35 +107,32 @@ export default function PriceChart({ hours }: Props) {
                 : 'CBC (BA→RS)'
           }
         />
-        <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="4 2" strokeWidth={1} />
+        <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="4 2" strokeWidth={1.5} opacity={0.5} />
 
-        {/* Efektivna cena — colored bars */}
-        <Bar dataKey="efektivna" name="efektivna" radius={[3, 3, 0, 0]} maxBarSize={28}>
+        <Bar dataKey="efektivna" name="efektivna" radius={[4, 4, 0, 0]} maxBarSize={22}>
           {hours.map((h) => (
             <Cell key={h.hour} fill={barColor(h.efektivna)} />
           ))}
         </Bar>
 
-        {/* SEEPEX day-ahead price */}
         <Line
           type="monotone"
           dataKey="seepex"
           name="seepex"
           stroke="#3b82f6"
-          strokeWidth={2}
+          strokeWidth={1.5}
           dot={false}
-          activeDot={{ r: 4 }}
+          activeDot={{ r: 3, strokeWidth: 0 }}
         />
 
-        {/* CBC */}
         <Line
           type="monotone"
           dataKey="cbc"
           name="cbc"
           stroke="#f97316"
-          strokeWidth={2}
+          strokeWidth={1.5}
           dot={false}
-          activeDot={{ r: 4 }}
+          activeDot={{ r: 3, strokeWidth: 0 }}
           strokeDasharray="5 3"
         />
       </ComposedChart>
