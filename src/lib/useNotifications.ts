@@ -39,6 +39,15 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   return view;
 }
 
+function getDeviceId(): string {
+  let id = localStorage.getItem("push_device_id");
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem("push_device_id", id);
+  }
+  return id;
+}
+
 async function showViaReg(
   title: string,
   options: NotificationOptions & { tag: string }
@@ -81,7 +90,7 @@ export function useNotifications(date: string, ranges: NotificationRange[], thre
         await fetch("/api/push/subscribe", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ subscription: sub.toJSON(), threshold }),
+          body: JSON.stringify({ subscription: sub.toJSON(), threshold, deviceId: getDeviceId() }),
         });
       } catch {
         // non-fatal
@@ -152,7 +161,7 @@ export function useNotifications(date: string, ranges: NotificationRange[], thre
           await fetch("/api/push/subscribe", {
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ endpoint: sub.endpoint }),
+            body: JSON.stringify({ endpoint: sub.endpoint, deviceId: getDeviceId() }),
           }).catch(() => {});
           await sub.unsubscribe();
         }
@@ -183,7 +192,7 @@ export function useNotifications(date: string, ranges: NotificationRange[], thre
         await fetch("/api/push/subscribe", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ subscription: sub.toJSON(), threshold }),
+          body: JSON.stringify({ subscription: sub.toJSON(), threshold, deviceId: getDeviceId() }),
         });
       } catch (err) {
         console.warn("Push subscription failed:", err);

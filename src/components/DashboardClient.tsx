@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, type ReactNode } from "react";
-import { TrendingDown, TrendingUp, Minus, Sun, Bell, BellOff, Zap } from "lucide-react";
+import Link from "next/link";
+import { TrendingDown, TrendingUp, Minus, Sun, Bell, BellOff, Zap, Smartphone } from "lucide-react";
 import type { PricesResponse } from "@/lib/types";
 import PriceChart from "./PriceChart";
 import PriceTable from "./PriceTable";
@@ -103,6 +104,15 @@ export default function DashboardClient({ todayData, tomorrowData }: Props) {
     threshold,
   );
 
+  const [showIOSHint, setShowIOSHint] = useState(false);
+  useEffect(() => {
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    const isStandalone =
+      (navigator as { standalone?: boolean }).standalone === true ||
+      window.matchMedia("(display-mode: standalone)").matches;
+    setShowIOSHint(isIOS && !isStandalone);
+  }, []);
+
   const [currentHour, setCurrentHour] = useState<number | null>(null);
   useEffect(() => {
     if (activeTab === "today") {
@@ -165,6 +175,16 @@ export default function DashboardClient({ todayData, tomorrowData }: Props) {
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <DataBadge ok={data.seepexAvailable} label="SEEPEX" />
             <DataBadge ok={data.cbcAvailable} label="CBC" />
+            {showIOSHint && (
+              <Link
+                href="/setup"
+                title="Postavi na iPhone za push obaveštenja"
+                className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors"
+              >
+                <Smartphone className="w-3 h-3" />
+                <span className="hidden sm:inline">Postavi</span>
+              </Link>
+            )}
             {supported && (
               <>
                 <button
