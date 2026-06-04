@@ -86,9 +86,21 @@ export default function DashboardClient({ todayData, tomorrowData }: Props) {
 
   const [ranges, setRanges] = useState<Range[]>([]);
   const handleRangesChange = useCallback((r: Range[]) => setRanges(r), []);
+
+  const [threshold, setThreshold] = useState(0);
+  useEffect(() => {
+    const saved = localStorage.getItem("notification_threshold");
+    if (saved !== null) setThreshold(Number(saved));
+  }, []);
+  const handleThresholdChange = useCallback((t: number) => {
+    setThreshold(t);
+    localStorage.setItem("notification_threshold", String(t));
+  }, []);
+
   const { active, permission, toggle, supported, sendTest } = useNotifications(
     data.date,
     ranges,
+    threshold,
   );
 
   const [currentHour, setCurrentHour] = useState<number | null>(null);
@@ -296,7 +308,12 @@ export default function DashboardClient({ todayData, tomorrowData }: Props) {
         </div>
 
         {/* Threshold section */}
-        <ThresholdSection hours={data.hours} onRangesChange={handleRangesChange} />
+        <ThresholdSection
+          hours={data.hours}
+          threshold={threshold}
+          onThresholdChange={handleThresholdChange}
+          onRangesChange={handleRangesChange}
+        />
 
         {/* Table card */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">

@@ -2,6 +2,18 @@
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
 
+self.addEventListener("push", (e) => {
+  const data = e.data?.json() ?? {};
+  e.waitUntil(
+    self.registration.showNotification(data.title ?? "⚡ Upozorenje", {
+      body: data.body ?? "",
+      icon: "/icon-192.png",
+      tag: data.tag ?? "push",
+      data: { url: "/" },
+    })
+  );
+});
+
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
   e.waitUntil(

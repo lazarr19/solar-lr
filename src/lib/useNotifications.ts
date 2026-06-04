@@ -11,7 +11,6 @@ function pad(n: number) {
   return String(n).padStart(2, "0");
 }
 
-// Convert a Belgrade local date+hour to a UTC ms timestamp.
 function belgradeDateHourToUTC(date: string, hour: number): number {
   const [y, m, d] = date.split("-").map(Number);
   const probeUTC = Date.UTC(y, m - 1, d, 12, 0, 0);
@@ -28,6 +27,18 @@ function belgradeDateHourToUTC(date: string, hour: number): number {
   return Date.UTC(y, m - 1, d, hour - offsetHours, 0, 0);
 }
 
+function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const buffer = new ArrayBuffer(rawData.length);
+  const view = new Uint8Array(buffer);
+  for (let i = 0; i < rawData.length; i++) {
+    view[i] = rawData.charCodeAt(i);
+  }
+  return view;
+}
+
 async function showViaReg(
   title: string,
   options: NotificationOptions & { tag: string }
@@ -36,13 +47,13 @@ async function showViaReg(
   await reg.showNotification(title, options);
 }
 
-export function useNotifications(date: string, ranges: NotificationRange[]) {
+export function useNotifications(date: string, ranges: NotificationRange[], threshold: number) {
   const supported =
     typeof window !== "undefined" &&
     "Notification" in window &&
-    "serviceWorker" in navigator;
+    "serviceWorker" in navigator &&
+    "PushManager" in window;
 
-  // SSR-safe: all start false/"default", synced after hydration
   const [enabled, setEnabled] = useState(false);
   const [permission, setPermission] =
     useState<NotificationPermission>("default");
@@ -54,16 +65,36 @@ export function useNotifications(date: string, ranges: NotificationRange[]) {
     setMounted(true);
     if (!supported) return;
     setPermission(Notification.permission);
-    // Default enabled on first visit (no key stored yet means opted-in)
     setEnabled(localStorage.getItem("notifications_enabled") !== "false");
     navigator.serviceWorker.register("/sw.js").catch(() => {});
   }, [supported]);
 
-  // Schedule / clear whenever anything changes
+  // Sync push subscription with server whenever enabled+granted and threshold changes
+  useEffect(() => {
+    if (!mounted || !supported || !enabled || permission !== "granted") return;
+
+    const id = setTimeout(async () => {
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (!sub) return;
+        await fetch("/api/push/subscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ subscription: sub.toJSON(), threshold }),
+        });
+      } catch {
+        // non-fatal
+      }
+    }, 800);
+
+    return () => clearTimeout(id);
+  }, [mounted, supported, enabled, permission, threshold]);
+
+  // Schedule local setTimeout notifications (works while app is open)
   useEffect(() => {
     if (!mounted || !supported) return;
 
-    // Cancel existing timers
     for (const id of timeoutIds.current) clearTimeout(id);
     timeoutIds.current = [];
 
@@ -105,18 +136,30 @@ export function useNotifications(date: string, ranges: NotificationRange[]) {
     };
   }, [mounted, supported, enabled, permission, date, ranges]);
 
-  // "active" = the system is actually working right now
   const active = mounted && enabled && permission === "granted";
 
   const toggle = useCallback(async () => {
     if (!supported) return;
 
     if (active) {
-      // Turn off
       setEnabled(false);
       localStorage.setItem("notifications_enabled", "false");
+
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          await fetch("/api/push/subscribe", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ endpoint: sub.endpoint }),
+          }).catch(() => {});
+          await sub.unsubscribe();
+        }
+      } catch {
+        // non-fatal
+      }
     } else {
-      // Turn on — request permission if not yet granted
       let perm = Notification.permission;
       if (perm === "default") {
         perm = await Notification.requestPermission();
@@ -125,8 +168,28 @@ export function useNotifications(date: string, ranges: NotificationRange[]) {
       if (perm !== "granted") return;
       setEnabled(true);
       localStorage.setItem("notifications_enabled", "true");
+
+      try {
+        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+        if (!vapidKey) throw new Error("VAPID key not configured");
+        const reg = await navigator.serviceWorker.ready;
+        let sub = await reg.pushManager.getSubscription();
+        if (!sub) {
+          sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(vapidKey),
+          });
+        }
+        await fetch("/api/push/subscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ subscription: sub.toJSON(), threshold }),
+        });
+      } catch (err) {
+        console.warn("Push subscription failed:", err);
+      }
     }
-  }, [supported, active]);
+  }, [supported, active, threshold]);
 
   const sendTest = useCallback(async () => {
     if (!supported) return;
@@ -136,7 +199,6 @@ export function useNotifications(date: string, ranges: NotificationRange[]) {
       setPermission(perm);
     }
     if (perm !== "granted") return;
-    // 5-second delay so the user can switch away from the tab
     setTimeout(() => {
       showViaReg("⚡ Test upozorenje", {
         body: "Sistem notifikacija radi ispravno!",
@@ -146,5 +208,11 @@ export function useNotifications(date: string, ranges: NotificationRange[]) {
     }, 5000);
   }, [supported]);
 
-  return { active, permission: mounted ? permission : "default" as NotificationPermission, toggle, supported: mounted && supported, sendTest };
+  return {
+    active,
+    permission: mounted ? permission : ("default" as NotificationPermission),
+    toggle,
+    supported: mounted && supported,
+    sendTest,
+  };
 }

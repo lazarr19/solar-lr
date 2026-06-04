@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useMemo, useEffect } from "react";
 import { Power } from "lucide-react";
 import type { HourlyPrice } from "@/lib/types";
 
@@ -77,12 +77,15 @@ function pad(n: number) {
 
 export default function ThresholdSection({
   hours,
+  threshold,
+  onThresholdChange,
   onRangesChange,
 }: {
   hours: HourlyPrice[];
+  threshold: number;
+  onThresholdChange: (t: number) => void;
   onRangesChange?: (ranges: Range[]) => void;
 }) {
-  const [threshold, setThreshold] = useState(0);
 
   const above = useMemo(
     () => hours.filter((h) => h.efektivna !== null && h.efektivna > threshold),
@@ -104,7 +107,7 @@ export default function ThresholdSection({
             <input
               type="number"
               value={threshold}
-              onChange={(e) => setThreshold(Number(e.target.value))}
+              onChange={(e) => onThresholdChange(Number(e.target.value))}
               className="w-20 text-right tabular-nums text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-lg px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-amber-400 border-0"
               step={5}
             />
