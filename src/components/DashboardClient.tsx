@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, type ReactNode } from "react";
 import Link from "next/link";
-import { TrendingDown, TrendingUp, Minus, Sun, Bell, BellOff, Zap, Smartphone } from "lucide-react";
+import { TrendingDown, TrendingUp, Minus, Sun, Bell, BellOff, Smartphone } from "lucide-react";
 import type { PricesResponse } from "@/lib/types";
 import PriceChart from "./PriceChart";
 import PriceTable from "./PriceTable";
@@ -98,7 +98,7 @@ export default function DashboardClient({ todayData, tomorrowData }: Props) {
     localStorage.setItem("notification_threshold", String(t));
   }, []);
 
-  const { active, permission, toggle, supported, sendTest } = useNotifications(
+  const { active, permission, toggle, supported } = useNotifications(
     data.date,
     ranges,
     threshold,
@@ -215,15 +215,6 @@ export default function DashboardClient({ todayData, tomorrowData }: Props) {
                     {active ? "Uključeno" : "Isključeno"}
                   </span>
                 </button>
-                {active && (
-                  <button
-                    onClick={sendTest}
-                    title="Pošalji test upozorenje za 5 sekundi"
-                    className="p-1 rounded-full text-slate-400 dark:text-slate-500 hover:text-amber-500 dark:hover:text-amber-400 transition-colors"
-                  >
-                    <Zap className="w-3.5 h-3.5" />
-                  </button>
-                )}
               </>
             )}
           </div>
