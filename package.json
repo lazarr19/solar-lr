@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@types/xml2js": "^0.4.14",
+    "@upstash/qstash": "^2.11.0",
     "@upstash/redis": "^1.38.0",
     "lucide-react": "^1.17.0",
     "next": "16.2.7",

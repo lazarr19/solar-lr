@@ -1,21 +1,17 @@
 import { NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
-import webpush from "web-push";
+import { Client } from "@upstash/qstash";
 import { getCachedPrices, getTodayInSerbia, getTomorrowInSerbia } from "@/lib/prices";
 import type { HourlyPrice } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT!,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!,
-);
-
 const redis = new Redis({
   url: process.env.KV_REST_API_URL!,
   token: process.env.KV_REST_API_TOKEN!,
 });
+
+const qstash = new Client({ token: process.env.QSTASH_TOKEN! });
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -42,86 +38,102 @@ function buildRanges(hours: HourlyPrice[], threshold: number) {
   return ranges;
 }
 
+// Convert a Belgrade date+hour to a UTC ms timestamp
+function belgradeDateHourToUTC(date: string, hour: number): number {
+  const [y, m, d] = date.split("-").map(Number);
+  const probeUTC = Date.UTC(y, m - 1, d, 12, 0, 0);
+  const belgHourAtNoon =
+    parseInt(
+      new Intl.DateTimeFormat("en", {
+        timeZone: "Europe/Belgrade",
+        hour: "numeric",
+        hour12: false,
+      }).format(new Date(probeUTC)),
+      10
+    ) % 24;
+  const offsetHours = belgHourAtNoon - 12;
+  return Date.UTC(y, m - 1, d, hour - offsetHours, 0, 0);
+}
+
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const currentHour =
-    parseInt(
-      new Intl.DateTimeFormat("en", {
-        timeZone: "Europe/Belgrade",
-        hour: "numeric",
-        hour12: false,
-      }).format(new Date()),
-      10
-    ) % 24;
-  const nextHour = (currentHour + 1) % 24;
-  const isLastHour = currentHour === 23;
+  const now = Date.now();
+  const todayDate = getTodayInSerbia();
+  const tomorrowDate = getTomorrowInSerbia();
+  const appUrl = process.env.APP_URL!;
 
-  // Today's prices: needed for end-of-interval check (endHour goes up to 24 for midnight)
-  // Tomorrow's prices: needed at 23:55 for intervals starting at hour 0
-  const todayPrices = await getCachedPrices(getTodayInSerbia());
-  const tomorrowPrices = isLastHour ? await getCachedPrices(getTomorrowInSerbia()) : null;
-
-  // endHour in buildRanges is prev+1, so an interval ending at midnight has endHour=24
-  const endHourTarget = isLastHour ? 24 : nextHour;
+  const [todayPrices, tomorrowPrices] = await Promise.all([
+    getCachedPrices(todayDate),
+    getCachedPrices(tomorrowDate),
+  ]);
 
   const allSubs = await redis.hgetall<
-    Record<string, { subscription: webpush.PushSubscription; threshold: number }>
+    Record<string, { subscription: { endpoint: string }; threshold: number }>
   >("push:subs");
 
-  if (!allSubs) return NextResponse.json({ sent: 0 });
+  if (!allSubs) return NextResponse.json({ scheduled: 0 });
 
-  const sends = Object.entries(allSubs).flatMap(([endpoint, stored]) => {
-    const { subscription, threshold } = stored;
-    const todayRanges = buildRanges(todayPrices.hours, threshold ?? 0);
-    const tomorrowRanges = tomorrowPrices
-      ? buildRanges(tomorrowPrices.hours, threshold ?? 0)
-      : [];
+  const schedules: Promise<unknown>[] = [];
 
-    const payloads: { title: string; body: string; tag: string }[] = [];
+  for (const [endpoint, stored] of Object.entries(allSubs)) {
+    const threshold = stored.threshold ?? 0;
+    const shortId = endpoint.slice(-20);
 
-    // Start notifications: at 23:55 check tomorrow's hour 0; otherwise today's nextHour
-    const startRanges = isLastHour ? tomorrowRanges : todayRanges;
-    const startDate = isLastHour ? getTomorrowInSerbia() : getTodayInSerbia();
-    for (const range of startRanges) {
-      if (range.startHour === nextHour) {
-        payloads.push({
-          title: "⚡ Uključite postrojenje za 5 min",
-          body: `Interval rada: ${pad(range.startHour)}:00 – ${pad(range.endHour === 24 ? 0 : range.endHour)}:00`,
-          tag: `on-${startDate}-${range.startHour}`,
-        });
-      }
-    }
+    for (const { prices, date } of [
+      { prices: todayPrices, date: todayDate },
+      { prices: tomorrowPrices, date: tomorrowDate },
+    ]) {
+      const ranges = buildRanges(prices.hours, threshold);
 
-    // End notifications: always check today's ranges using endHourTarget (24 at midnight)
-    for (const range of todayRanges) {
-      if (range.endHour === endHourTarget) {
-        payloads.push({
-          title: "⚡ Isključite postrojenje za 5 min",
-          body: `Kraj intervala u ${pad(nextHour)}:00`,
-          tag: `off-${getTodayInSerbia()}-${nextHour}`,
-        });
-      }
-    }
-
-    return payloads.map((payload) => ({ endpoint, subscription, payload }));
-  });
-
-  const results = await Promise.allSettled(
-    sends.map(({ endpoint, subscription, payload }) =>
-      webpush.sendNotification(subscription, JSON.stringify(payload)).catch(async (err) => {
-        const statusCode = (err as { statusCode?: number }).statusCode;
-        if (statusCode === 404 || statusCode === 410) {
-          await redis.hdel("push:subs", endpoint);
+      for (const range of ranges) {
+        // Start notification — 10 min before interval begins
+        const startUtc = belgradeDateHourToUTC(date, range.startHour);
+        const startNotifyAt = startUtc - 10 * 60 * 1000;
+        if (startNotifyAt > now + 30_000) {
+          const endDisplay = range.endHour === 24 ? 0 : range.endHour;
+          schedules.push(
+            qstash.publishJSON({
+              url: `${appUrl}/api/push/send`,
+              body: {
+                endpoint,
+                title: "⚡ Uključite postrojenje za 10 min",
+                body: `Interval rada: ${pad(range.startHour)}:00 – ${pad(endDisplay)}:00`,
+                tag: `on-${date}-${range.startHour}`,
+              },
+              notBefore: Math.floor(startNotifyAt / 1000),
+              deduplicationId: `on-${shortId}-${date}-${range.startHour}`,
+            }).catch(() => null)
+          );
         }
-        throw err;
-      })
-    )
-  );
 
-  const sent = results.filter((r) => r.status === "fulfilled").length;
-  return NextResponse.json({ sent });
+        // End notification — 10 min before interval ends (endHour=24 means midnight)
+        const endUtc = belgradeDateHourToUTC(date, range.endHour);
+        const endNotifyAt = endUtc - 10 * 60 * 1000;
+        if (endNotifyAt > now + 30_000) {
+          const endDisplay = range.endHour === 24 ? 0 : range.endHour;
+          schedules.push(
+            qstash.publishJSON({
+              url: `${appUrl}/api/push/send`,
+              body: {
+                endpoint,
+                title: "⚡ Isključite postrojenje za 10 min",
+                body: `Kraj intervala u ${pad(endDisplay)}:00`,
+                tag: `off-${date}-${range.endHour}`,
+              },
+              notBefore: Math.floor(endNotifyAt / 1000),
+              deduplicationId: `off-${shortId}-${date}-${range.endHour}`,
+            }).catch(() => null)
+          );
+        }
+      }
+    }
+  }
+
+  const results = await Promise.allSettled(schedules);
+  const scheduled = results.filter((r) => r.status === "fulfilled").length;
+  return NextResponse.json({ scheduled });
 }
