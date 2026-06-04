@@ -21,31 +21,46 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const allSubs = await redis.hgetall<
-    Record<string, { subscription: webpush.PushSubscription; threshold: number }>
-  >("push:subs");
+  const raw = await redis.hgetall("push:subs");
+  if (!raw) return NextResponse.json({ results: [], total: 0 });
 
-  if (!allSubs) return NextResponse.json({ sent: 0 });
+  const entries = Object.entries(raw as Record<string, unknown>);
 
-  const results = await Promise.allSettled(
-    Object.entries(allSubs).map(([endpoint, stored]) =>
-      webpush.sendNotification(
-        stored.subscription,
-        JSON.stringify({
-          title: "⚡ Test push upozorenje",
-          body: "Push notifikacije rade ispravno!",
-          tag: "push-test",
-        })
-      ).catch(async (err) => {
-        const statusCode = (err as { statusCode?: number }).statusCode;
-        if (statusCode === 404 || statusCode === 410) {
+  const results = await Promise.all(
+    entries.map(async ([endpoint, value]) => {
+      const shortEndpoint = endpoint.slice(0, 50) + "...";
+      let stored: { subscription: webpush.PushSubscription; threshold: number };
+      try {
+        stored = typeof value === "string" ? JSON.parse(value) : (value as typeof stored);
+      } catch {
+        return { endpoint: shortEndpoint, status: "parse_error" };
+      }
+
+      try {
+        await webpush.sendNotification(
+          stored.subscription,
+          JSON.stringify({
+            title: "⚡ Test push upozorenje",
+            body: "Push notifikacije rade ispravno!",
+            tag: "push-test",
+          })
+        );
+        return { endpoint: shortEndpoint, threshold: stored.threshold, status: "sent" };
+      } catch (err) {
+        const e = err as { statusCode?: number; body?: string; message?: string };
+        if (e.statusCode === 404 || e.statusCode === 410) {
           await redis.hdel("push:subs", endpoint);
         }
-        throw err;
-      })
-    )
+        return {
+          endpoint: shortEndpoint,
+          threshold: stored.threshold,
+          status: "failed",
+          statusCode: e.statusCode,
+          error: e.body ?? e.message,
+        };
+      }
+    })
   );
 
-  const sent = results.filter((r) => r.status === "fulfilled").length;
-  return NextResponse.json({ sent, total: Object.keys(allSubs).length });
+  return NextResponse.json({ total: entries.length, results });
 }
