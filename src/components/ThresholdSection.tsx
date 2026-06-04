@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Power } from "lucide-react";
 import type { HourlyPrice } from "@/lib/types";
 
@@ -31,7 +31,7 @@ function pillStyle(v: number): { bg: string; text: string } {
   };
 }
 
-interface Range {
+export interface Range {
   startHour: number;
   endHour: number;
   avgEfektivna: number;
@@ -75,13 +75,24 @@ function pad(n: number) {
   return String(n).padStart(2, "0");
 }
 
-export default function ThresholdSection({ hours }: { hours: HourlyPrice[] }) {
+export default function ThresholdSection({
+  hours,
+  onRangesChange,
+}: {
+  hours: HourlyPrice[];
+  onRangesChange?: (ranges: Range[]) => void;
+}) {
   const [threshold, setThreshold] = useState(0);
 
-  const above = hours.filter(
-    (h) => h.efektivna !== null && h.efektivna > threshold,
+  const above = useMemo(
+    () => hours.filter((h) => h.efektivna !== null && h.efektivna > threshold),
+    [hours, threshold],
   );
-  const ranges = buildRanges(above);
+  const ranges = useMemo(() => buildRanges(above), [above]);
+
+  useEffect(() => {
+    onRangesChange?.(ranges);
+  }, [ranges, onRangesChange]);
 
   return (
     <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 p-4 sm:p-5">
@@ -90,16 +101,16 @@ export default function ThresholdSection({ hours }: { hours: HourlyPrice[] }) {
           Satovi iznad praga
         </h2>
         <div className="flex items-center gap-1.5">
-          <input
-            type="number"
-            value={threshold}
-            onChange={(e) => setThreshold(Number(e.target.value))}
-            className="w-20 text-right tabular-nums text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-lg px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-amber-400 border-0"
-            step={5}
-          />
-          <span className="text-xs text-slate-400 dark:text-slate-500 flex-shrink-0">
-            &euro;/MWh
-          </span>
+            <input
+              type="number"
+              value={threshold}
+              onChange={(e) => setThreshold(Number(e.target.value))}
+              className="w-20 text-right tabular-nums text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-lg px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-amber-400 border-0"
+              step={5}
+            />
+            <span className="text-xs text-slate-400 dark:text-slate-500 flex-shrink-0">
+              &euro;/MWh
+            </span>
         </div>
       </div>
 

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, type ReactNode } from "react";
-import { TrendingDown, TrendingUp, Minus, Sun } from "lucide-react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
+import { TrendingDown, TrendingUp, Minus, Sun, Bell, BellOff, Zap } from "lucide-react";
 import type { PricesResponse } from "@/lib/types";
 import PriceChart from "./PriceChart";
 import PriceTable from "./PriceTable";
-import ThresholdSection from "./ThresholdSection";
+import ThresholdSection, { type Range } from "./ThresholdSection";
+import { useNotifications } from "@/lib/useNotifications";
 
 function formatDisplayDate(isoDate: string): string {
   const [y, m, d] = isoDate.split("-").map(Number);
@@ -83,6 +84,13 @@ export default function DashboardClient({ todayData, tomorrowData }: Props) {
   const [activeTab, setActiveTab] = useState<"today" | "tomorrow">("today");
   const data = activeTab === "today" ? todayData : tomorrowData;
 
+  const [ranges, setRanges] = useState<Range[]>([]);
+  const handleRangesChange = useCallback((r: Range[]) => setRanges(r), []);
+  const { active, permission, toggle, supported, sendTest } = useNotifications(
+    data.date,
+    ranges,
+  );
+
   const [currentHour, setCurrentHour] = useState<number | null>(null);
   useEffect(() => {
     if (activeTab === "today") {
@@ -134,7 +142,8 @@ export default function DashboardClient({ todayData, tomorrowData }: Props) {
             </div>
             <div className="min-w-0">
               <h1 className="text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100 leading-tight truncate">
-                Cene električne energije
+                <span className="sm:hidden">Cene struje</span>
+                <span className="hidden sm:inline">Cene električne energije</span>
               </h1>
               <p className="text-xs text-slate-400 dark:text-slate-500 leading-none hidden sm:block">
                 Srbija · {activeTab === "today" ? "današnje" : "sutrašnje"} cene
@@ -144,6 +153,47 @@ export default function DashboardClient({ todayData, tomorrowData }: Props) {
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <DataBadge ok={data.seepexAvailable} label="SEEPEX" />
             <DataBadge ok={data.cbcAvailable} label="CBC" />
+            {supported && (
+              <>
+                <button
+                  onClick={toggle}
+                  disabled={permission === "denied"}
+                  title={
+                    permission === "denied"
+                      ? "Notifikacije su blokirane u pregledaču"
+                      : active
+                        ? "Isključi upozorenja"
+                        : "Uključi upozorenja (10 min pre intervala)"
+                  }
+                  className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                    active
+                      ? "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900"
+                      : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+                  }`}
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${active ? "bg-amber-500" : "bg-slate-400 dark:bg-slate-500"}`}
+                  />
+                  {active ? (
+                    <Bell className="w-3 h-3" />
+                  ) : (
+                    <BellOff className="w-3 h-3" />
+                  )}
+                  <span className="hidden sm:inline">
+                    {active ? "Uključeno" : "Isključeno"}
+                  </span>
+                </button>
+                {active && (
+                  <button
+                    onClick={sendTest}
+                    title="Pošalji test upozorenje za 5 sekundi"
+                    className="p-1 rounded-full text-slate-400 dark:text-slate-500 hover:text-amber-500 dark:hover:text-amber-400 transition-colors"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -246,7 +296,7 @@ export default function DashboardClient({ todayData, tomorrowData }: Props) {
         </div>
 
         {/* Threshold section */}
-        <ThresholdSection hours={data.hours} />
+        <ThresholdSection hours={data.hours} onRangesChange={handleRangesChange} />
 
         {/* Table card */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden">
