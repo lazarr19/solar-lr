@@ -83,17 +83,26 @@ export async function GET(request: Request) {
     const threshold = stored.threshold ?? 0;
     const shortId = endpoint.slice(-20);
 
-    for (const { prices, date } of [
-      { prices: todayPrices, date: todayDate },
-      { prices: tomorrowPrices, date: tomorrowDate },
-    ]) {
-      const ranges = buildRanges(prices.hours, threshold);
+    const todayRanges = buildRanges(todayPrices.hours, threshold);
+    const tomorrowRanges = buildRanges(tomorrowPrices.hours, threshold);
 
+    // If today ends at midnight AND tomorrow starts at midnight, prices are continuous
+    // across the day boundary — skip both phantom notifications
+    const todayEndsAtMidnight = todayRanges.some((r) => r.endHour === 24);
+    const tomorrowStartsAtMidnight = tomorrowRanges.some((r) => r.startHour === 0);
+    const continuousAcrossMidnight = todayEndsAtMidnight && tomorrowStartsAtMidnight;
+
+    for (const { ranges, date } of [
+      { ranges: todayRanges, date: todayDate },
+      { ranges: tomorrowRanges, date: tomorrowDate },
+    ]) {
       for (const range of ranges) {
         // Start notification — 10 min before interval begins
+        // Skip if this is the midnight continuation (tomorrow starts at 0, no real transition)
+        const isPhantomStart = continuousAcrossMidnight && date === tomorrowDate && range.startHour === 0;
         const startUtc = belgradeDateHourToUTC(date, range.startHour);
         const startNotifyAt = startUtc - 10 * 60 * 1000;
-        if (startNotifyAt > now + 30_000) {
+        if (!isPhantomStart && startNotifyAt > now + 30_000) {
           const endDisplay = range.endHour === 24 ? 0 : range.endHour;
           schedules.push(
             qstash.publishJSON({
@@ -111,9 +120,11 @@ export async function GET(request: Request) {
         }
 
         // End notification — 10 min before interval ends (endHour=24 means midnight)
+        // Skip if this is the midnight continuation (today ends at 24, no real transition)
+        const isPhantomEnd = continuousAcrossMidnight && date === todayDate && range.endHour === 24;
         const endUtc = belgradeDateHourToUTC(date, range.endHour);
         const endNotifyAt = endUtc - 10 * 60 * 1000;
-        if (endNotifyAt > now + 30_000) {
+        if (!isPhantomEnd && endNotifyAt > now + 30_000) {
           const endDisplay = range.endHour === 24 ? 0 : range.endHour;
           schedules.push(
             qstash.publishJSON({
