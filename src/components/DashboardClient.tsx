@@ -85,9 +85,11 @@ interface Props {
 export default function DashboardClient({ todayData, tomorrowData }: Props) {
   const router = useRouter();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState<number | null>(null);
 
   const handleRefresh = useCallback(() => {
     setIsRefreshing(true);
+    setLastRefreshed(Date.now());
     router.refresh();
     setTimeout(() => setIsRefreshing(false), 1500);
   }, [router]);
@@ -271,7 +273,7 @@ export default function DashboardClient({ todayData, tomorrowData }: Props) {
                 Učitano
               </p>
               <p className="text-xs font-medium text-slate-500 dark:text-slate-400 tabular-nums">
-                {new Date(data.fetchedAt).toLocaleTimeString("sr-RS", {
+                {new Date(lastRefreshed ?? data.fetchedAt).toLocaleTimeString("sr-RS", {
                   timeZone: "Europe/Belgrade",
                   hour: "2-digit",
                   minute: "2-digit",
@@ -281,10 +283,10 @@ export default function DashboardClient({ todayData, tomorrowData }: Props) {
                 onClick={handleRefresh}
                 disabled={isRefreshing}
                 className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500 hover:text-amber-500 dark:hover:text-amber-400 transition-colors disabled:opacity-50"
-                aria-label="Osvježi podatke"
+                aria-label="Osveži podatke"
               >
                 <RefreshCw className={`w-3 h-3 ${isRefreshing ? "animate-spin" : ""}`} />
-                Osvježi
+                Osveži
               </button>
             </div>
           </div>
