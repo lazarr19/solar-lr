@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { TrendingDown, TrendingUp, Minus, Sun, Bell, BellOff, Smartphone } from "lucide-react";
+import { TrendingDown, TrendingUp, Minus, Sun, Bell, BellOff, Smartphone, RefreshCw } from "lucide-react";
 import type { PricesResponse } from "@/lib/types";
 import PriceChart from "./PriceChart";
 import PriceTable from "./PriceTable";
-import ThresholdSection, { type Range } from "./ThresholdSection";
+import ThresholdSection from "./ThresholdSection";
 import { useNotifications } from "@/lib/useNotifications";
 
 function formatDisplayDate(isoDate: string): string {
@@ -82,11 +83,17 @@ interface Props {
 }
 
 export default function DashboardClient({ todayData, tomorrowData }: Props) {
+  const router = useRouter();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    router.refresh();
+    setTimeout(() => setIsRefreshing(false), 1500);
+  }, [router]);
+
   const [activeTab, setActiveTab] = useState<"today" | "tomorrow">("today");
   const data = activeTab === "today" ? todayData : tomorrowData;
-
-  const [ranges, setRanges] = useState<Range[]>([]);
-  const handleRangesChange = useCallback((r: Range[]) => setRanges(r), []);
 
   const [threshold, setThreshold] = useState(0);
   useEffect(() => {
@@ -98,11 +105,7 @@ export default function DashboardClient({ todayData, tomorrowData }: Props) {
     localStorage.setItem("notification_threshold", String(t));
   }, []);
 
-  const { active, permission, toggle, supported } = useNotifications(
-    data.date,
-    ranges,
-    threshold,
-  );
+  const { active, permission, toggle, supported } = useNotifications(threshold);
 
   const [showIOSHint, setShowIOSHint] = useState(false);
   useEffect(() => {
@@ -263,7 +266,7 @@ export default function DashboardClient({ todayData, tomorrowData }: Props) {
                 </p>
               )}
             </div>
-            <div className="text-right flex-shrink-0">
+            <div className="text-right flex-shrink-0 flex flex-col items-end gap-1">
               <p className="text-xs text-slate-400 dark:text-slate-500">
                 Učitano
               </p>
@@ -274,6 +277,15 @@ export default function DashboardClient({ todayData, tomorrowData }: Props) {
                   minute: "2-digit",
                 })}
               </p>
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500 hover:text-amber-500 dark:hover:text-amber-400 transition-colors disabled:opacity-50"
+                aria-label="Osvježi podatke"
+              >
+                <RefreshCw className={`w-3 h-3 ${isRefreshing ? "animate-spin" : ""}`} />
+                Osvježi
+              </button>
             </div>
           </div>
         </div>
@@ -323,7 +335,6 @@ export default function DashboardClient({ todayData, tomorrowData }: Props) {
           hours={data.hours}
           threshold={threshold}
           onThresholdChange={handleThresholdChange}
-          onRangesChange={handleRangesChange}
         />
 
         {/* Table card */}

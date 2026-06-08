@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect } from "react";
+import { useMemo } from "react";
 import { Power } from "lucide-react";
 import type { HourlyPrice } from "@/lib/types";
 
@@ -79,12 +79,10 @@ export default function ThresholdSection({
   hours,
   threshold,
   onThresholdChange,
-  onRangesChange,
 }: {
   hours: HourlyPrice[];
   threshold: number;
   onThresholdChange: (t: number) => void;
-  onRangesChange?: (ranges: Range[]) => void;
 }) {
 
   const above = useMemo(
@@ -92,10 +90,6 @@ export default function ThresholdSection({
     [hours, threshold],
   );
   const ranges = useMemo(() => buildRanges(above), [above]);
-
-  useEffect(() => {
-    onRangesChange?.(ranges);
-  }, [ranges, onRangesChange]);
 
   return (
     <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 p-4 sm:p-5">
