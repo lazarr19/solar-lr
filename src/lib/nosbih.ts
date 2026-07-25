@@ -81,13 +81,16 @@ async function fetchCBCFromWeb(
   }
 
   const cbc: (number | null)[] = Array(24).fill(null);
+  // The table lists both directions (BA-RS and RS-BA) per hour — must filter
+  // on the "Смјер" column, not just take the first/last row per hour.
   const rowRegex =
-    /<tr>\s*<td>(\d{2}):\d{2} - \d{2}:\d{2}<\/td>\s*<td>[^<]*<\/td>\s*<td>[^<]*<\/td>\s*<td>[^<]*<\/td>\s*<td>[^<]*<\/td>\s*<td>([\d.]+)<\/td>/g;
+    /<tr>\s*<td>(\d{2}):\d{2} - \d{2}:\d{2}<\/td>\s*<td>([^<]*)<\/td>\s*<td>[^<]*<\/td>\s*<td>[^<]*<\/td>\s*<td>[^<]*<\/td>\s*<td>([\d.]+)<\/td>/g;
 
   let match: RegExpExecArray | null;
   while ((match = rowRegex.exec(json.data)) !== null) {
+    if (match[2] !== "BA-RS") continue;
     const hourIndex = parseInt(match[1], 10);
-    const price = parseFloat(match[2]);
+    const price = parseFloat(match[3]);
     if (hourIndex >= 0 && hourIndex <= 23 && !isNaN(price)) {
       cbc[hourIndex] = Math.round(price * 100) / 100;
     }
