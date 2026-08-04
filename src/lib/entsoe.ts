@@ -31,7 +31,12 @@ export async function fetchDayAheadPrices(
     const res = await fetch(`${ENERGY_CHARTS_API}?${params}`, {
       next: { revalidate: 3600 },
     });
-    if (!res.ok) return Array(24).fill(null);
+    if (!res.ok) {
+      console.error(
+        `[entsoe] energy-charts fetch failed for ${deliveryDate}: HTTP ${res.status}`,
+      );
+      return Array(24).fill(null);
+    }
 
     const data = (await res.json()) as {
       unix_seconds: number[];
@@ -39,6 +44,9 @@ export async function fetchDayAheadPrices(
     };
 
     if (!Array.isArray(data.unix_seconds) || !Array.isArray(data.price)) {
+      console.error(
+        `[entsoe] energy-charts response for ${deliveryDate} missing unix_seconds/price arrays`,
+      );
       return Array(24).fill(null);
     }
 
@@ -61,7 +69,8 @@ export async function fetchDayAheadPrices(
     }
 
     return prices;
-  } catch {
+  } catch (err) {
+    console.error(`[entsoe] energy-charts fetch threw for ${deliveryDate}:`, err);
     return Array(24).fill(null);
   }
 }
